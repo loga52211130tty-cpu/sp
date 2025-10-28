@@ -1,55 +1,87 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧藥盒管理</title>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; }
-        h1 { color: #333; }
-        button { padding: 10px 20px; margin: 10px 5px 10px 0; font-size: 16px; cursor: pointer; }
-        #output { margin-top: 20px; white-space: pre-wrap; background: #fff; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智慧藥盒管理</title>
+<style>
+body { font-family: Arial; padding: 20px; background: #f9f9f9; }
+table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+th { background: #eee; }
+button { margin: 5px; padding: 5px 10px; }
+</style>
 </head>
 <body>
-    <h1>智慧藥盒資料操作</h1>
-    <button onclick="readData()">讀取試算表資料</button>
-    <button onclick="writeData()">寫入範例資料</button>
-    <div id="output">操作結果會顯示在這裡</div>
+<h1>智慧藥盒管理</h1>
 
-    <script>
-        const scriptURL = "https://script.google.com/macros/s/AKfycbzxBXGJLEg861dSxTqZPJp-yoQRu4_tdlpKCte1N3kCuamGmBNZAsqIzhb_HhYhVML8/exec";
+<input type="text" id="newName" placeholder="藥品名稱">
+<input type="time" id="newTime">
+<button onclick="addMedicine()">新增藥品</button>
+<button onclick="fetchData()">重新整理</button>
 
-        // 讀取資料
-        async function readData() {
-            try {
-                const response = await fetch(scriptURL + "?action=read");
-                const data = await response.json();
-                document.getElementById("output").textContent = JSON.stringify(data, null, 2);
-            } catch (err) {
-                document.getElementById("output").textContent = "讀取失敗：" + err;
-            }
-        }
+<table id="medicineTable">
+  <thead>
+    <tr><th>#</th><th>藥品名稱</th><th>時間</th><th>已服用</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
-        // 寫入資料
-        async function writeData() {
-            try {
-                const payload = {
-                    action: "write",
-                    data: { name: "測試藥品", time: "08:00" }
-                };
-                const response = await fetch(scriptURL, {
-                    method: "POST",
-                    body: JSON.stringify(payload),
-                    headers: { "Content-Type": "application/json" }
-                });
-                const result = await response.json();
-                document.getElementById("output").textContent = JSON.stringify(result, null, 2);
-            } catch (err) {
-                document.getElementById("output").textContent = "寫入失敗：" + err;
-            }
-        }
-    </script>
+<script>
+const scriptURL = "https://script.google.com/macros/s/AKfycbzxBXGJLEg861dSxTqZPJp-yoQRu4_tdlpKCte1N3kCuamGmBNZAsqIzhb_HhYhVML8/exec";
+let medicines = [];
+
+async function fetchData() {
+  const res = await fetch(scriptURL);
+  const data = await res.json();
+  medicines = data.data;
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.querySelector("#medicineTable tbody");
+  tbody.innerHTML = "";
+  medicines.forEach((med, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${med.name}</td>
+      <td>${med.time}</td>
+      <td><input type="checkbox" ${med.done?"checked":""} onchange="toggleDone(${i}, this.checked)"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function addMedicine() {
+  const name = document.getElementById("newName").value.trim();
+  const time = document.getElementById("newTime").value;
+  if(!name || !time) return alert("請輸入藥品名稱和時間");
+  
+  const payload = {action:"write", data:{name, time, done:false}};
+  const res = await fetch(scriptURL, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: {"Content-Type":"application/json"}
+  });
+  const result = await res.json();
+  alert(result.status === "success" ? "新增成功" : result.message);
+  fetchData();
+}
+
+async function toggleDone(index, done) {
+  medicines[index].done = done;
+  const payload = {action:"update", data: [{rowIndex: index + 1, done}]};
+  const res = await fetch(scriptURL, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: {"Content-Type":"application/json"}
+  });
+  const result = await res.json();
+  if(result.status !== "success") alert(result.message);
+}
+
+fetchData();
+</script>
 </body>
 </html>
-
