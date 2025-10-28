@@ -1,87 +1,88 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>智慧藥盒管理</title>
-<style>
-body { font-family: Arial; padding: 20px; background: #f9f9f9; }
-table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-th { background: #eee; }
-button { margin: 5px; padding: 5px 10px; }
-</style>
+  <meta charset="UTF-8">
+  <title>智慧藥盒</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background-color: #f4f4f4; }
+    input[type="text"], input[type="time"] { padding: 4px; }
+    button { padding: 6px 12px; margin-top: 10px; cursor: pointer; }
+  </style>
 </head>
 <body>
-<h1>智慧藥盒管理</h1>
+  <h1>智慧藥盒管理</h1>
 
-<input type="text" id="newName" placeholder="藥品名稱">
-<input type="time" id="newTime">
-<button onclick="addMedicine()">新增藥品</button>
-<button onclick="fetchData()">重新整理</button>
+  <div>
+    <input type="text" id="medName" placeholder="藥品名稱">
+    <input type="time" id="medTime">
+    <button onclick="addMedicine()">新增藥品</button>
+  </div>
 
-<table id="medicineTable">
-  <thead>
-    <tr><th>#</th><th>藥品名稱</th><th>時間</th><th>已服用</th></tr>
-  </thead>
-  <tbody></tbody>
-</table>
+  <table id="medTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>藥品名稱</th>
+        <th>時間</th>
+        <th>已服用</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
-<script>
-const scriptURL = "https://script.google.com/macros/s/AKfycbzxBXGJLEg861dSxTqZPJp-yoQRu4_tdlpKCte1N3kCuamGmBNZAsqIzhb_HhYhVML8/exec";
-let medicines = [];
+  <script>
+    const scriptURL = "https://script.google.com/macros/s/AKfycbwxOl74ue1pG5rHSSueIwP5gMrA05lgTmk9PN1vSRzAYkcHPKHyNvTLNeAij2kvnYrv/exec";
 
-async function fetchData() {
-  const res = await fetch(scriptURL);
-  const data = await res.json();
-  medicines = data.data;
-  renderTable();
-}
+    // 讀取藥品列表
+    async function loadMedicines() {
+      const res = await fetch(scriptURL);
+      const data = await res.json();
+      const tbody = document.querySelector("#medTable tbody");
+      tbody.innerHTML = "";
+      data.data.forEach((med, index) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${med.name}</td>
+          <td>${med.time}</td>
+          <td>
+            <input type="checkbox" ${med.done ? "checked" : ""} onchange="toggleDone(${index}, this.checked)">
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
 
-function renderTable() {
-  const tbody = document.querySelector("#medicineTable tbody");
-  tbody.innerHTML = "";
-  medicines.forEach((med, i) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${i+1}</td>
-      <td>${med.name}</td>
-      <td>${med.time}</td>
-      <td><input type="checkbox" ${med.done?"checked":""} onchange="toggleDone(${i}, this.checked)"></td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
+    // 勾選已服用
+    async function toggleDone(index, done) {
+      await fetch(scriptURL, {
+        method: "POST",
+        body: JSON.stringify({ action: "update", data: [{ rowIndex: index, done }] })
+      });
+      loadMedicines(); // 更新列表
+    }
 
-async function addMedicine() {
-  const name = document.getElementById("newName").value.trim();
-  const time = document.getElementById("newTime").value;
-  if(!name || !time) return alert("請輸入藥品名稱和時間");
-  
-  const payload = {action:"write", data:{name, time, done:false}};
-  const res = await fetch(scriptURL, {
-    method: "POST",
-    body: JSON.stringify(payload),
-    headers: {"Content-Type":"application/json"}
-  });
-  const result = await res.json();
-  alert(result.status === "success" ? "新增成功" : result.message);
-  fetchData();
-}
+    // 新增藥品
+    async function addMedicine() {
+      const name = document.getElementById("medName").value.trim();
+      const time = document.getElementById("medTime").value;
+      if (!name || !time) { alert("請輸入藥品名稱和時間"); return; }
 
-async function toggleDone(index, done) {
-  medicines[index].done = done;
-  const payload = {action:"update", data: [{rowIndex: index + 1, done}]};
-  const res = await fetch(scriptURL, {
-    method: "POST",
-    body: JSON.stringify(payload),
-    headers: {"Content-Type":"application/json"}
-  });
-  const result = await res.json();
-  if(result.status !== "success") alert(result.message);
-}
+      await fetch(scriptURL, {
+        method: "POST",
+        body: JSON.stringify({ action: "write", data: { name, time, done: false } })
+      });
 
-fetchData();
-</script>
+      document.getElementById("medName").value = "";
+      document.getElementById("medTime").value = "";
+      loadMedicines();
+    }
+
+    // 初始載入
+    loadMedicines();
+  </script>
 </body>
 </html>
