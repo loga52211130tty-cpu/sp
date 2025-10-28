@@ -1,88 +1,103 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <title>智慧藥盒</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background-color: #f4f4f4; }
-    input[type="text"], input[type="time"] { padding: 4px; }
-    button { padding: 6px 12px; margin-top: 10px; cursor: pointer; }
-  </style>
+<meta charset="UTF-8">
+<title>智慧藥盒管理</title>
+<style>
+  table { border-collapse: collapse; width: 50%; }
+  th, td { border: 1px solid #333; padding: 8px; text-align: center; }
+  th { background-color: #eee; }
+  input[type="text"], input[type="time"] { width: 100%; }
+  button { padding: 4px 8px; }
+</style>
 </head>
 <body>
-  <h1>智慧藥盒管理</h1>
+<h2>智慧藥盒管理</h2>
 
-  <div>
-    <input type="text" id="medName" placeholder="藥品名稱">
-    <input type="time" id="medTime">
-    <button onclick="addMedicine()">新增藥品</button>
-  </div>
+<!-- 新增藥品區 -->
+<div>
+  <input type="text" id="newName" placeholder="藥品名稱">
+  <input type="time" id="newTime">
+  <button onclick="addDrug()">新增藥品</button>
+</div>
 
-  <table id="medTable">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>藥品名稱</th>
-        <th>時間</th>
-        <th>已服用</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<!-- 藥品列表 -->
+<table id="drugTable">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>藥品名稱</th>
+      <th>時間</th>
+      <th>已服用</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
-  <script>
-    const scriptURL = "https://script.google.com/macros/s/AKfycbwxOl74ue1pG5rHSSueIwP5gMrA05lgTmk9PN1vSRzAYkcHPKHyNvTLNeAij2kvnYrv/exec";
+<script>
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwxOl74ue1pG5rHSSueIwP5gMrA05lgTmk9PN1vSRzAYkcHPKHyNvTLNeAij2kvnYrv/exec';
 
-    // 讀取藥品列表
-    async function loadMedicines() {
-      const res = await fetch(scriptURL);
-      const data = await res.json();
-      const tbody = document.querySelector("#medTable tbody");
+// 取得並顯示列表
+function fetchDrugs() {
+  fetch(WEB_APP_URL)
+    .then(res => res.json())
+    .then(json => {
+      const tbody = document.querySelector("#drugTable tbody");
       tbody.innerHTML = "";
-      data.data.forEach((med, index) => {
+      json.data.forEach(item => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${index + 1}</td>
-          <td>${med.name}</td>
-          <td>${med.time}</td>
-          <td>
-            <input type="checkbox" ${med.done ? "checked" : ""} onchange="toggleDone(${index}, this.checked)">
-          </td>
+          <td>${item.rowIndex - 1}</td>
+          <td>${item.name}</td>
+          <td>${item.time}</td>
+          <td><input type="checkbox" data-row-index="${item.rowIndex}" ${item.done ? 'checked' : ''} onchange="toggleDone(this)"></td>
         `;
         tbody.appendChild(tr);
       });
+    });
+}
+
+// 勾選已服用
+function toggleDone(cb) {
+  const rowIndex = parseInt(cb.dataset.rowIndex);
+  const done = cb.checked;
+  fetch(WEB_APP_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "update", data: [{ rowIndex, done }] })
+  })
+  .then(res => res.json())
+  .then(result => {
+    if(result.status !== "success") {
+      alert("更新失敗");
+      cb.checked = !done;
     }
+  });
+}
 
-    // 勾選已服用
-    async function toggleDone(index, done) {
-      await fetch(scriptURL, {
-        method: "POST",
-        body: JSON.stringify({ action: "update", data: [{ rowIndex: index, done }] })
-      });
-      loadMedicines(); // 更新列表
+// 新增藥品
+function addDrug() {
+  const name = document.getElementById("newName").value.trim();
+  const time = document.getElementById("newTime").value;
+  if(!name || !time) { alert("請輸入藥品名稱與時間"); return; }
+
+  fetch(WEB_APP_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "write", data: { name, time, done: false } })
+  })
+  .then(res => res.json())
+  .then(result => {
+    if(result.status === "success") {
+      document.getElementById("newName").value = "";
+      document.getElementById("newTime").value = "";
+      fetchDrugs();
+    } else {
+      alert("新增失敗：" + result.message);
     }
+  });
+}
 
-    // 新增藥品
-    async function addMedicine() {
-      const name = document.getElementById("medName").value.trim();
-      const time = document.getElementById("medTime").value;
-      if (!name || !time) { alert("請輸入藥品名稱和時間"); return; }
-
-      await fetch(scriptURL, {
-        method: "POST",
-        body: JSON.stringify({ action: "write", data: { name, time, done: false } })
-      });
-
-      document.getElementById("medName").value = "";
-      document.getElementById("medTime").value = "";
-      loadMedicines();
-    }
-
-    // 初始載入
-    loadMedicines();
-  </script>
+// 初始化
+fetchDrugs();
+</script>
 </body>
 </html>
