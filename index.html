@@ -1,92 +1,54 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<title>智慧藥盒模擬</title>
-<style>
-  body { font-family: sans-serif; padding: 20px; text-align: center; }
-  button { padding: 20px 40px; font-size: 24px; margin-top: 30px; }
-  #status { margin-top: 20px; font-size: 20px; }
-  #currentTime { margin-top: 10px; font-size: 18px; color: #555; }
-  #log { margin-top: 30px; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto;}
-  #log ul { padding-left: 20px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧藥盒管理</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; }
+        h1 { color: #333; }
+        button { padding: 10px 20px; margin: 10px 5px 10px 0; font-size: 16px; cursor: pointer; }
+        #output { margin-top: 20px; white-space: pre-wrap; background: #fff; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+    </style>
 </head>
 <body>
+    <h1>智慧藥盒資料操作</h1>
+    <button onclick="readData()">讀取試算表資料</button>
+    <button onclick="writeData()">寫入範例資料</button>
+    <div id="output">操作結果會顯示在這裡</div>
 
-<h1>智慧藥盒模擬</h1>
+    <script>
+        const scriptURL = "https://script.google.com/macros/s/AKfycbwxOl74ue1pG5rHSSueIwP5gMrA05lgTmk9PN1vSRzAYkcHPKHyNvTLNeAij2kvnYrv/exec";
 
-<button id="toggleBtn">我</button>
-<div id="status">目前狀態：關閉</div>
-<div id="currentTime"></div>
+        // 讀取資料
+        async function readData() {
+            try {
+                const response = await fetch(scriptURL + "?action=read");
+                const data = await response.json();
+                document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                document.getElementById("output").textContent = "讀取失敗：" + err;
+            }
+        }
 
-<div id="log">
-  <h2>歷史紀錄</h2>
-  <ul id="recordList"></ul>
-</div>
-
-<script>
-// ----------------------
-// 初始化
-// ----------------------
-let boxOpened = false;
-const toggleBtn = document.getElementById('toggleBtn');
-const statusDiv = document.getElementById('status');
-const recordList = document.getElementById('recordList');
-const currentTimeDiv = document.getElementById('currentTime');
-
-// 顯示當前時間
-function updateCurrentTime() {
-    const now = new Date();
-    currentTimeDiv.textContent = `當前時間：${now.toLocaleString()}`;
-}
-setInterval(updateCurrentTime, 1000);
-updateCurrentTime();
-
-// ----------------------
-// Google 表單設定
-// ----------------------
-// 1. 這裡填入你的 Google 表單 formResponse URL
-const FORM_URL = "https://docs.google.com/forms/d/e/d/1s8o01rW7MiwN1T_Yb3wq61dRhFIcbKqmsU10lYaSsH8/formResponse";
-
-// 2. 表單欄位 entry ID (需用瀏覽器開發者工具抓取)
-// 假設「時間」欄位 entry.123456，「狀態」欄位 entry.654321
-const TIME_ENTRY = "entry.123456";
-const STATUS_ENTRY = "entry.654321";
-
-// ----------------------
-// 提交歷史紀錄到 Google 表單
-// ----------------------
-function submitToForm(status) {
-    const now = new Date().toLocaleString();
-    const formData = new FormData();
-    formData.append(TIME_ENTRY, now);
-    formData.append(STATUS_ENTRY, status);
-
-    fetch(FORM_URL, { method: "POST", body: formData, mode: "no-cors" })
-    .then(() => console.log("寫入表單成功"))
-    .catch(err => console.error("寫入表單失敗", err));
-}
-
-// ----------------------
-// 按鈕事件
-// ----------------------
-toggleBtn.addEventListener('click', () => {
-    boxOpened = !boxOpened;
-    const status = boxOpened ? "開啟" : "關閉";
-
-    // 更新網頁歷史紀錄
-    const li = document.createElement('li');
-    li.textContent = `${status} - ${new Date().toLocaleString()}`;
-    recordList.appendChild(li);
-    li.scrollIntoView({behavior: "smooth"});
-
-    // 寫入 Google 表單
-    submitToForm(status);
-});
-</script>
-
+        // 寫入資料
+        async function writeData() {
+            try {
+                const payload = {
+                    action: "write",
+                    data: { name: "測試藥品", time: "08:00" }
+                };
+                const response = await fetch(scriptURL, {
+                    method: "POST",
+                    body: JSON.stringify(payload),
+                    headers: { "Content-Type": "application/json" }
+                });
+                const result = await response.json();
+                document.getElementById("output").textContent = JSON.stringify(result, null, 2);
+            } catch (err) {
+                document.getElementById("output").textContent = "寫入失敗：" + err;
+            }
+        }
+    </script>
 </body>
 </html>
-
-
