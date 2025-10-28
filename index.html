@@ -5,26 +5,59 @@
 <title>智慧藥盒模擬</title>
 <style>
   body { font-family: sans-serif; padding: 20px; text-align: center; }
-  button { padding: 20px 40px; font-size: 24px; margin-top: 50px; }
-  #status { margin-top: 30px; font-size: 20px; }
+  button { padding: 20px 40px; font-size: 24px; margin-top: 30px; }
+  #status { margin-top: 20px; font-size: 20px; }
+  #currentTime { margin-top: 10px; font-size: 18px; color: #555; }
+  #log { margin-top: 30px; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto;}
+  #log ul { padding-left: 20px; }
 </style>
 </head>
 <body>
 
 <h1>智慧藥盒模擬</h1>
 
-<button id="toggleBtn">A鍵：開/關藥盒</button>
+<!-- 按鈕 -->
+<button id="toggleBtn">馬</button>
 
+<!-- 狀態顯示 -->
 <div id="status">目前狀態：關閉</div>
+
+<!-- 當前時間 -->
+<div id="currentTime"></div>
+
+<!-- 歷史紀錄 -->
+<div id="log">
+  <h2>歷史紀錄</h2>
+  <ul id="recordList"></ul>
+</div>
 
 <script>
 let boxOpened = false;
 const toggleBtn = document.getElementById('toggleBtn');
 const statusDiv = document.getElementById('status');
+const recordList = document.getElementById('recordList');
+const currentTimeDiv = document.getElementById('currentTime');
 
+// 更新當前時間
+function updateCurrentTime() {
+    const now = new Date();
+    currentTimeDiv.textContent = `當前時間：${now.toLocaleString()}`;
+}
+// 每秒更新一次
+setInterval(updateCurrentTime, 1000);
+updateCurrentTime(); // 初始化顯示
+
+// 按鈕點擊事件
 toggleBtn.addEventListener('click', () => {
     boxOpened = !boxOpened;
+    const timestamp = new Date().toLocaleString();
     statusDiv.textContent = `目前狀態：${boxOpened ? "開啟" : "關閉"}`;
+
+    // 加入歷史紀錄
+    const li = document.createElement('li');
+    li.textContent = `${boxOpened ? "藥盒打開" : "藥盒關閉"} - ${timestamp}`;
+    recordList.appendChild(li);
+    li.scrollIntoView({behavior: "smooth"});
 });
 </script>
 
