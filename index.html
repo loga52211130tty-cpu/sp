@@ -16,48 +16,73 @@
 
 <h1>智慧藥盒模擬</h1>
 
-<!-- 按鈕 -->
 <button id="toggleBtn">馬</button>
-
-<!-- 狀態顯示 -->
 <div id="status">目前狀態：關閉</div>
-
-<!-- 當前時間 -->
 <div id="currentTime"></div>
 
-<!-- 歷史紀錄 -->
 <div id="log">
   <h2>歷史紀錄</h2>
   <ul id="recordList"></ul>
 </div>
 
 <script>
+// ----------------------
+// 初始化
+// ----------------------
 let boxOpened = false;
 const toggleBtn = document.getElementById('toggleBtn');
 const statusDiv = document.getElementById('status');
 const recordList = document.getElementById('recordList');
 const currentTimeDiv = document.getElementById('currentTime');
 
-// 更新當前時間
+// 顯示當前時間
 function updateCurrentTime() {
     const now = new Date();
     currentTimeDiv.textContent = `當前時間：${now.toLocaleString()}`;
 }
-// 每秒更新一次
 setInterval(updateCurrentTime, 1000);
-updateCurrentTime(); // 初始化顯示
+updateCurrentTime();
 
-// 按鈕點擊事件
+// ----------------------
+// Google 表單設定
+// ----------------------
+// 1. 這裡填入你的 Google 表單 formResponse URL
+const FORM_URL = "https://docs.google.com/forms/d/e/你的表單ID/formResponse";
+
+// 2. 表單欄位 entry ID (需用瀏覽器開發者工具抓取)
+// 假設「時間」欄位 entry.123456，「狀態」欄位 entry.654321
+const TIME_ENTRY = "entry.123456";
+const STATUS_ENTRY = "entry.654321";
+
+// ----------------------
+// 提交歷史紀錄到 Google 表單
+// ----------------------
+function submitToForm(status) {
+    const now = new Date().toLocaleString();
+    const formData = new FormData();
+    formData.append(TIME_ENTRY, now);
+    formData.append(STATUS_ENTRY, status);
+
+    fetch(FORM_URL, { method: "POST", body: formData, mode: "no-cors" })
+    .then(() => console.log("寫入表單成功"))
+    .catch(err => console.error("寫入表單失敗", err));
+}
+
+// ----------------------
+// 按鈕事件
+// ----------------------
 toggleBtn.addEventListener('click', () => {
     boxOpened = !boxOpened;
-    const timestamp = new Date().toLocaleString();
-    statusDiv.textContent = `目前狀態：${boxOpened ? "開啟" : "關閉"}`;
+    const status = boxOpened ? "開啟" : "關閉";
 
-    // 加入歷史紀錄
+    // 更新網頁歷史紀錄
     const li = document.createElement('li');
-    li.textContent = `${boxOpened ? "藥盒打開" : "藥盒關閉"} - ${timestamp}`;
+    li.textContent = `${status} - ${new Date().toLocaleString()}`;
     recordList.appendChild(li);
     li.scrollIntoView({behavior: "smooth"});
+
+    // 寫入 Google 表單
+    submitToForm(status);
 });
 </script>
 
