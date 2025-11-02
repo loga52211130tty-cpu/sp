@@ -4,17 +4,31 @@
   <meta charset="UTF-8">
   <title>智慧藥盒管理</title>
   <style>
-    table { border-collapse: collapse; width: 60%; margin-bottom: 20px; }
-    th, td { border: 1px solid #333; padding: 8px; text-align: center; }
-    th { background-color: #eee; }
-    select, input[type="text"], input[type="time"] { width: 100%; }
-    button { padding: 4px 8px; }
+    table {
+      border-collapse: collapse;
+      width: 60%;
+      margin-bottom: 20px;
+    }
+    th, td {
+      border: 1px solid #333;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #eee;
+    }
+    select, input[type="text"], input[type="time"] {
+      width: 100%;
+    }
+    button {
+      padding: 4px 8px;
+    }
   </style>
 </head>
 <body>
   <h2>智慧藥盒管理</h2>
 
-  <!-- 新增藥品區 -->
+  <!-- 新增藥品 -->
   <div>
     <select id="drugSelect">
       <option value="">-- 選擇歷史藥品 --</option>
@@ -24,7 +38,7 @@
     <button onclick="addDrug()">新增藥品</button>
   </div>
 
-  <!-- 目前藥品清單 -->
+  <!-- 主列表 -->
   <h3>目前藥品列表</h3>
   <table id="drugTable">
     <thead>
@@ -39,13 +53,13 @@
     <tbody></tbody>
   </table>
 
-  <!-- 漏吃藥品清單 -->
+  <!-- 漏吃藥品 -->
   <h3>漏吃藥品列表</h3>
   <table id="missedTable">
     <thead>
       <tr>
         <th>數目</th>
-        <th>藥品名稱(漏吃藥品)</th>
+        <th>藥品名稱 (漏吃藥品)</th>
         <th>時間</th>
       </tr>
     </thead>
@@ -53,87 +67,123 @@
   </table>
 
   <script>
-    const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE';
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwxOl74ue1pG5rHSSueIwP5gMrA05lgTmk9PN1vSRzAYkcHPKHyNvTLNeAij2kvnYrv/exec';
 
+    // 取得主表
     function fetchDrugs() {
       fetch(WEB_APP_URL)
         .then(res => res.json())
         .then(json => {
           const tbody = document.querySelector("#drugTable tbody");
-          let html = "";
+          tbody.innerHTML = "";
           json.data.forEach((item, idx) => {
-            html += `<tr>
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
               <td>${idx + 1}</td>
               <td>${item.name}</td>
               <td>${item.time}</td>
               <td><input type="checkbox" data-row-index="${item.rowIndex}" ${item.done ? 'checked' : ''} onchange="toggleDone(this)"></td>
               <td><button onclick="deleteDrug(${item.rowIndex})">刪除</button></td>
-            </tr>`;
+            `;
+            tbody.appendChild(tr);
           });
-          tbody.innerHTML = html;
-        });
-
-      // 同時抓漏吃藥品表
-      fetch(WEB_APP_URL + '?mode=missed')
-        .then(res => res.json())
-        .then(json => {
-          const tbody = document.querySelector("#missedTable tbody");
-          let html = "";
-          json.missed.forEach((item, idx)=>{
-            html += `<tr>
-              <td>${idx+1}</td>
-              <td>${item.name}</td>
-              <td>${item.time}</td>
-            </tr>`;
-          });
-          tbody.innerHTML = html;
+          // 更新漏吃表
+          showMissed(json.data);
         });
     }
 
+    // 取得漏吃藥品
+    function showMissed(data) {
+      const tbody = document.querySelector("#missedTable tbody");
+      tbody.innerHTML = "";
+      const missed = data.filter(d => !d.done);
+      missed.forEach((item, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>${item.name}</td>
+          <td>${item.time}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 勾選更新服用狀態
     function toggleDone(cb) {
       const rowIndex = parseInt(cb.dataset.rowIndex);
       const done = cb.checked;
       fetch(WEB_APP_URL, {
         method: "POST",
-        body: JSON.stringify({ action:"update", data:[{rowIndex, done}] })
-      }).then(res=>res.json())
-        .then(result=>{
-          if(result.status!=="success") { alert("更新失敗"); cb.checked = !done; }
-        });
+        body: JSON.stringify({
+          action: "update",
+          data: [{ rowIndex, done }]
+        })
+      })
+      .then(res => res.json())
+      .then(result => {
+        if (result.status === "success") {
+          fetchDrugs();
+        } else {
+          alert("更新失敗");
+          cb.checked = !done;
+        }
+      });
     }
 
-    function deleteDrug(rowIndex) {
-      if(!confirm("確定要刪除這個藥品嗎？")) return;
-      fetch(WEB_APP_URL, {
-        method:"POST",
-        body: JSON.stringify({ action:"delete", data:{rowIndex} })
-      }).then(res=>res.json())
-        .then(result=>{
-          if(result.status==="success") fetchDrugs();
-          else alert("刪除失敗："+result.message);
-        });
-    }
-
+    // 新增藥品
     function addDrug() {
       const selected = document.getElementById("drugSelect").value;
       const manual = document.getElementById("newName").value.trim();
       const name = manual || selected;
       const time = document.getElementById("newTime").value;
-      if(!name || !time){ alert("請輸入藥品名稱與時間"); return; }
+
+      if (!name || !time) {
+        alert("請輸入藥品名稱與時間");
+        return;
+      }
+
       fetch(WEB_APP_URL, {
-        method:"POST",
-        body: JSON.stringify({ action:"write", data:{name,time,done:false} })
-      }).then(res=>res.json())
-        .then(result=>{
-          if(result.status==="success"){
-            document.getElementById("newName").value="";
-            document.getElementById("newTime").value="";
-            fetchDrugs();       
-            fetchHistoryList();
-          } else alert("新增失敗："+result.message);
-        });
+        method: "POST",
+        body: JSON.stringify({
+          action: "write",
+          data: { name, time, done: false }
+        })
+      })
+      .then(res => res.json())
+      .then(result => {
+        if (result.status === "success") {
+          document.getElementById("newName").value = "";
+          document.getElementById("newTime").value = "";
+          fetchDrugs();
+          fetchHistoryList();
+        } else {
+          alert("新增失敗：" + result.message);
+        }
+      });
     }
 
+    // 刪除藥品
+    function deleteDrug(rowIndex) {
+      if (!confirm("確定要刪除此藥品？")) return;
+      fetch(WEB_APP_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "delete",
+          rowIndex: rowIndex
+        })
+      })
+      .then(res => res.json())
+      .then(result => {
+        if (result.status === "success") {
+          fetchDrugs();
+          fetchHistoryList();
+        } else {
+          alert("刪除失敗：" + result.message);
+        }
+      });
+    }
+
+    // 取得歷史藥品（從現有名稱欄）
     function fetchHistoryList() {
       fetch(WEB_APP_URL + '?mode=history')
         .then(res => res.json())
@@ -149,9 +199,9 @@
         });
     }
 
+    // 初始化
     fetchDrugs();
     fetchHistoryList();
-    setInterval(fetchDrugs, 1000); // 每秒刷新
   </script>
 </body>
 </html>
