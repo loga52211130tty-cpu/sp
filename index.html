@@ -62,22 +62,17 @@
         .then(res => res.json())
         .then(json => {
           const tbody = document.querySelector("#drugTable tbody");
-          tbody.innerHTML = "";
+          let html = "";
           json.data.forEach((item, idx) => {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
+            html += `<tr>
               <td>${idx + 1}</td>
               <td>${item.name}</td>
               <td>${item.time}</td>
-              <td>
-                <input type="checkbox" data-row-index="${item.rowIndex}" ${item.done ? 'checked' : ''} onchange="toggleDone(this)">
-              </td>
-              <td>
-                <button onclick="deleteDrug(${item.rowIndex})">刪除</button>
-              </td>
-            `;
-            tbody.appendChild(tr);
+              <td><input type="checkbox" data-row-index="${item.rowIndex}" ${item.done ? 'checked' : ''} onchange="toggleDone(this)"></td>
+              <td><button onclick="deleteDrug(${item.rowIndex})">刪除</button></td>
+            </tr>`;
           });
+          tbody.innerHTML = html;
         });
     }
 
@@ -85,6 +80,7 @@
     function toggleDone(cb) {
       const rowIndex = parseInt(cb.dataset.rowIndex);
       const done = cb.checked;
+
       fetch(WEB_APP_URL, {
         method: "POST",
         body: JSON.stringify({
@@ -94,9 +90,9 @@
       })
       .then(res => res.json())
       .then(result => {
-        if (result.status !== "success") {
+        if(result.status !== "success") {
           alert("更新失敗");
-          cb.checked = !done;
+          cb.checked = !done; // 回復原狀
         }
       });
     }
@@ -114,9 +110,9 @@
       })
       .then(res => res.json())
       .then(result => {
-        if (result.status === "success") {
-          fetchDrugs();
-          fetchHistoryList();
+        if(result.status === "success") {
+          fetchDrugs();       // 刪除後立即更新表格
+          fetchHistoryList(); // 同步歷史藥品
         } else {
           alert("刪除失敗：" + result.message);
         }
@@ -144,11 +140,11 @@
       })
       .then(res => res.json())
       .then(result => {
-        if (result.status === "success") {
+        if(result.status === "success") {
           document.getElementById("newName").value = "";
           document.getElementById("newTime").value = "";
-          fetchDrugs();
-          fetchHistoryList();
+          fetchDrugs();       // 新增後立即更新表格
+          fetchHistoryList(); // 同步歷史藥品
         } else {
           alert("新增失敗：" + result.message);
         }
@@ -174,6 +170,9 @@
     // 初始化
     fetchDrugs();
     fetchHistoryList();
+
+    // 自動每秒刷新藥品清單（防止多人共用時資料不同步）
+    setInterval(fetchDrugs, 1000);
   </script>
 </body>
 </html>
