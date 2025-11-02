@@ -20,11 +20,17 @@ tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
 
 <h2>智慧藥盒完整版</h2>
 
+<!-- 顯示目前時間 -->
+<div>
+  <h3>目前時間：<span id="currentTime"></span></h3>
+</div>
+
 <!-- 新增藥品 -->
 <div>
   <input type="text" id="newName" list="drugNames" placeholder="藥品名稱">
   <datalist id="drugNames"></datalist>
-  <input type="text" id="newTimes" placeholder="時間（多個用逗號隔開，如08:00,12:00）">
+  <input type="time" id="newTime">
+  <input type="text" id="newTimes" placeholder="多時間用逗號隔開，如 08:00,12:00">
   <button onclick="addDrug()">新增藥品</button>
 </div>
 
@@ -45,6 +51,25 @@ tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
 const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE'; // ← 替換為你的 Web App URL
 let drugCache = [];
 const audio = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
+
+// 顯示目前時間
+function updateClock() {
+  const now = new Date();
+  const h = now.getHours().toString().padStart(2,'0');
+  const m = now.getMinutes().toString().padStart(2,'0');
+  const s = now.getSeconds().toString().padStart(2,'0');
+  document.getElementById("currentTime").textContent = `${h}:${m}:${s}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// 預設新增時間為現在
+function setDefaultTime(){
+  const now = new Date();
+  const hhmm = now.toTimeString().slice(0,5);
+  document.getElementById("newTime").value = hhmm;
+}
+setDefaultTime();
 
 // 申請通知權限
 if(Notification.permission !== "granted") Notification.requestPermission();
@@ -72,13 +97,12 @@ function renderTable(data){
   });
   let idx=1;
   for(let name in groupMap){
-    // 分組標題
     const header = document.createElement("tr");
     header.className="group-header";
     header.innerHTML=`<td colspan="5">${name}（點擊折疊/展開）</td>`;
     header.onclick = ()=>toggleGroup(name);
     tbody.appendChild(header);
-    // 藥品列
+
     groupMap[name].forEach(item=>{
       const tr = document.createElement("tr");
       tr.dataset.rowIndex = item.rowIndex;
@@ -121,13 +145,17 @@ function toggleDone(cb,rowIndex){
 // 新增藥品（多時間）
 function addDrug(){
   const name = document.getElementById("newName").value.trim();
-  const times = document.getElementById("newTimes").value.trim().split(",");
+  const timesRaw = document.getElementById("newTimes").value.trim();
+  let times = [];
+  if(timesRaw) times = timesRaw.split(",").map(t=>t.trim());
+  else times = [document.getElementById("newTime").value];
+
   if(!name || times.length===0) return alert("請輸入名稱與時間");
 
   let promises = times.map(time=>fetch(WEB_APP_URL,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({action:"write",data:{name,time:time.trim(),done:false}})
+    body: JSON.stringify({action:"write",data:{name,time,done:false}})
   }).then(res=>res.json()));
 
   Promise.all(promises).then(results=>{
@@ -135,6 +163,7 @@ function addDrug(){
     if(failed.length>0) alert("有些藥品新增失敗");
     document.getElementById("newName").value="";
     document.getElementById("newTimes").value="";
+    setDefaultTime();
     fetchDrugs();
   });
 }
@@ -162,7 +191,7 @@ function toggleGroup(name){
 // 提醒高亮 + 音效 + 通知
 function checkReminders(){
   const now = new Date();
-  const nowTime = now.getHours()*60+now.getMinutes();
+  const nowTime = now.getHours()*60 + now.getMinutes();
   document.querySelectorAll("#drugTable tbody tr").forEach(tr=>{
     if(!tr.dataset.rowIndex) return;
     const timeText = tr.children[2].textContent;
@@ -188,6 +217,7 @@ function checkReminders(){
 fetchDrugs();
 setInterval(fetchDrugs,10000);      // 每10秒更新資料
 setInterval(checkReminders,10000);  // 每10秒檢查提醒
+
 </script>
 
 </body>
