@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>智慧藥盒管理（完整版）</title>
+<title>智慧藥盒完整版</title>
 <style>
 body { font-family: Arial; }
 table { border-collapse: collapse; width: 80%; margin-top:10px; }
@@ -18,7 +18,7 @@ tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
 </head>
 <body>
 
-<h2>智慧藥盒管理</h2>
+<h2>智慧藥盒完整版</h2>
 
 <!-- 新增藥品 -->
 <div>
@@ -28,7 +28,6 @@ tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
   <button onclick="addDrug()">新增藥品</button>
 </div>
 
-<!-- 藥品表格 -->
 <table id="drugTable">
   <thead>
     <tr>
@@ -43,35 +42,31 @@ tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
 </table>
 
 <script>
-const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE'; // ← 替換成你最新部署 Web App URL
+const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE'; // ← 替換為你的 Web App URL
 let drugCache = [];
-
-// 提醒音效
 const audio = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
 
-// 請求瀏覽器通知權限
-if (Notification.permission !== "granted") {
-  Notification.requestPermission();
-}
+// 申請通知權限
+if(Notification.permission !== "granted") Notification.requestPermission();
 
 // 取得資料
-function fetchDrugs() {
+function fetchDrugs(){
   fetch(WEB_APP_URL)
-    .then(res => res.json())
-    .then(json => {
-      if(json.status !== "success") return;
+    .then(res=>res.json())
+    .then(json=>{
+      if(json.status!=="success") return;
+      drugCache = json.data;
       renderTable(json.data);
       updateDatalist(json.data);
-      drugCache = json.data;
     });
 }
 
 // 渲染表格
 function renderTable(data){
   const tbody = document.querySelector("#drugTable tbody");
-  tbody.innerHTML = "";
-  let groupMap = {};
-  data.forEach(item => {
+  tbody.innerHTML="";
+  let groupMap={};
+  data.forEach(item=>{
     if(!groupMap[item.name]) groupMap[item.name]=[];
     groupMap[item.name].push(item);
   });
@@ -100,7 +95,7 @@ function renderTable(data){
   }
 }
 
-// 更新 datalist（歷史藥品提示）
+// 更新 datalist
 function updateDatalist(data){
   const dl = document.getElementById("drugNames");
   dl.innerHTML="";
@@ -114,29 +109,26 @@ function updateDatalist(data){
 
 // 勾選已服用
 function toggleDone(cb,rowIndex){
-  const done=cb.checked;
   fetch(WEB_APP_URL,{
     method:"POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({action:"update",data:[{rowIndex,done}]})
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({action:"update",data:[{rowIndex,done:cb.checked}]})
   }).then(res=>res.json()).then(result=>{
-    if(result.status!=="success"){ alert("更新失敗"); cb.checked=!done; }
+    if(result.status!=="success"){ alert("更新失敗"); cb.checked=!cb.checked; }
   });
 }
 
-// 新增藥品（可多時間）
+// 新增藥品（多時間）
 function addDrug(){
   const name = document.getElementById("newName").value.trim();
   const times = document.getElementById("newTimes").value.trim().split(",");
   if(!name || times.length===0) return alert("請輸入名稱與時間");
 
-  let promises = times.map(time =>
-    fetch(WEB_APP_URL,{
-      method:"POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({action:"write",data:{name,time:time.trim(),done:false}})
-    }).then(res=>res.json())
-  );
+  let promises = times.map(time=>fetch(WEB_APP_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({action:"write",data:{name,time:time.trim(),done:false}})
+  }).then(res=>res.json()));
 
   Promise.all(promises).then(results=>{
     let failed = results.filter(r=>r.status!=="success");
@@ -149,10 +141,10 @@ function addDrug(){
 
 // 刪除藥品
 function deleteDrug(rowIndex){
-  if(!confirm("確定刪除此藥品？")) return;
+  if(!confirm("確定刪除這筆藥品嗎？")) return;
   fetch(WEB_APP_URL,{
     method:"POST",
-    headers: {"Content-Type":"application/json"},
+    headers:{"Content-Type":"application/json"},
     body: JSON.stringify({action:"delete",rowIndex})
   }).then(res=>res.json()).then(r=>{
     if(r.status==="success") fetchDrugs();
@@ -179,16 +171,13 @@ function checkReminders(){
     const target = h*60+m;
     const diff = target - nowTime;
     const checkbox = tr.querySelector("input[type=checkbox]");
-    
-    if(diff >= 0 && diff <= 5 && !checkbox.checked){
+    if(diff>=0 && diff<=5 && !checkbox.checked){
       tr.classList.add("remind");
-      audio.play().catch(e=>console.log("播放音效失敗", e));
-      if(Notification.permission === "granted"){
-        const name = tr.children[1].textContent;
-        const timeStr = tr.children[2].textContent;
-        new Notification("智慧藥盒提醒", {
-          body: `${timeStr} 要服用 ${name}`,
-          icon: "https://img.icons8.com/color/48/000000/pill.png"
+      audio.play().catch(e=>console.log(e));
+      if(Notification.permission==="granted"){
+        new Notification("智慧藥盒提醒",{
+          body:`${tr.children[2].textContent} 要服用 ${tr.children[1].textContent}`,
+          icon:"https://img.icons8.com/color/48/000000/pill.png"
         });
       }
     } else tr.classList.remove("remind");
@@ -197,8 +186,8 @@ function checkReminders(){
 
 // 初始化
 fetchDrugs();
-setInterval(fetchDrugs,10000);      // 每 10 秒刷新試算表
-setInterval(checkReminders,10000);  // 每 10 秒檢查提醒
+setInterval(fetchDrugs,10000);      // 每10秒更新資料
+setInterval(checkReminders,10000);  // 每10秒檢查提醒
 </script>
 
 </body>
