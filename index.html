@@ -57,18 +57,19 @@ const WEB_APP_URL = 'YOUR_DEPLOYED_WEB_APP_URL';
 let mainVersion = 0;
 let missedVersion = 0;
 
-// 取得主表
+// 智慧取得主表資料
 function fetchMain(){
   fetch(WEB_APP_URL)
-    .then(res=>res.json())
-    .then(json=>{
+    .then(res => res.json())
+    .then(json => {
+      // 如果版本不同才更新表格
       if(json.version !== mainVersion){
         mainVersion = json.version;
         const tbody = document.querySelector("#drugTable tbody");
-        tbody.innerHTML="";
-        json.data.forEach((item,idx)=>{
-          const tr=document.createElement("tr");
-          tr.innerHTML=`
+        tbody.innerHTML = "";
+        json.data.forEach((item, idx) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
             <td>${idx+1}</td>
             <td>${item.name}</td>
             <td>${item.date}</td>
@@ -83,18 +84,18 @@ function fetchMain(){
     });
 }
 
-// 取得漏吃表
+// 智慧取得漏吃表資料
 function fetchMissed(){
-  fetch(WEB_APP_URL+'?mode=missed')
-    .then(res=>res.json())
-    .then(json=>{
+  fetch(WEB_APP_URL + '?mode=missed')
+    .then(res => res.json())
+    .then(json => {
       if(json.version !== missedVersion){
         missedVersion = json.version;
         const tbody = document.querySelector("#missedTable tbody");
-        tbody.innerHTML="";
-        json.missed.forEach((item,idx)=>{
-          const tr=document.createElement("tr");
-          tr.innerHTML=`
+        tbody.innerHTML = "";
+        json.missed.forEach((item, idx) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
             <td>${idx+1}</td>
             <td>${item.name}</td>
             <td>${item.date}</td>
@@ -113,10 +114,11 @@ function toggleDone(cb){
   fetch(WEB_APP_URL,{
     method:"POST",
     body: JSON.stringify({action:"update", data:[{rowIndex, done}]})
-  }).then(res=>res.json()).then(result=>{
-    if(result.status==="success") fetchMain();
-    else { alert("更新失敗"); cb.checked = !done; }
-  });
+  }).then(res=>res.json())
+    .then(result=>{
+      if(result.status === "success") fetchMain();
+      else { alert("更新失敗"); cb.checked = !done; }
+    });
 }
 
 // 新增藥品
@@ -129,15 +131,16 @@ function addDrug(){
 
   fetch(WEB_APP_URL,{
     method:"POST",
-    body: JSON.stringify({action:"write", data:{name, time, done:false}})
-  }).then(res=>res.json()).then(result=>{
-    if(result.status==="success"){
-      document.getElementById("newName").value="";
-      document.getElementById("newTime").value="";
-      fetchMain();
-      fetchHistory();
-    } else alert("新增失敗："+result.message);
-  });
+    body: JSON.stringify({action:"write", data:{name,time,done:false}})
+  }).then(res=>res.json())
+    .then(result=>{
+      if(result.status==="success"){
+        document.getElementById("newName").value="";
+        document.getElementById("newTime").value="";
+        fetchMain();
+        fetchHistory();
+      } else alert("新增失敗：" + result.message);
+    });
 }
 
 // 刪除藥品
@@ -146,22 +149,23 @@ function deleteDrug(rowIndex){
   fetch(WEB_APP_URL,{
     method:"POST",
     body: JSON.stringify({action:"delete", data:{rowIndex}})
-  }).then(res=>res.json()).then(result=>{
-    if(result.status==="success"){ fetchMain(); fetchHistory(); }
-    else alert("刪除失敗："+result.message);
-  });
+  }).then(res=>res.json())
+    .then(result=>{
+      if(result.status==="success"){ fetchMain(); fetchHistory(); }
+      else alert("刪除失敗：" + result.message);
+    });
 }
 
-// 歷史藥品
+// 歷史藥品列表
 function fetchHistory(){
-  fetch(WEB_APP_URL+'?mode=history')
+  fetch(WEB_APP_URL + '?mode=history')
     .then(res=>res.json())
     .then(json=>{
       const select = document.getElementById("drugSelect");
-      select.innerHTML='<option value="">-- 選擇歷史藥品 --</option>';
+      select.innerHTML = '<option value="">-- 選擇歷史藥品 --</option>';
       json.history.forEach(name=>{
         const opt = document.createElement("option");
-        opt.value=name; opt.textContent=name;
+        opt.value = name; opt.textContent = name;
         select.appendChild(opt);
       });
     });
@@ -170,7 +174,8 @@ function fetchHistory(){
 // 初始化
 fetchMain();
 fetchHistory();
-setInterval(()=>{ fetchMain(); fetchHistory(); },10000);
+// 每 5 秒檢查一次資料變化
+setInterval(()=>{ fetchMain(); fetchHistory(); },5000);
 </script>
 </body>
 </html>
