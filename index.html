@@ -47,6 +47,7 @@
         <th>藥品名稱</th>
         <th>時間</th>
         <th>已服用</th>
+        <th>操作</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -62,13 +63,18 @@
         .then(json => {
           const tbody = document.querySelector("#drugTable tbody");
           tbody.innerHTML = "";
-          json.data.forEach(item => {
+          json.data.forEach((item, idx) => {
             const tr = document.createElement("tr");
             tr.innerHTML = `
-              <td>${item.rowIndex - 1}</td>
+              <td>${idx + 1}</td>
               <td>${item.name}</td>
               <td>${item.time}</td>
-              <td><input type="checkbox" data-row-index="${item.rowIndex}" ${item.done ? 'checked' : ''} onchange="toggleDone(this)"></td>
+              <td>
+                <input type="checkbox" data-row-index="${item.rowIndex}" ${item.done ? 'checked' : ''} onchange="toggleDone(this)">
+              </td>
+              <td>
+                <button onclick="deleteDrug(${item.rowIndex})">刪除</button>
+              </td>
             `;
             tbody.appendChild(tr);
           });
@@ -91,6 +97,28 @@
         if (result.status !== "success") {
           alert("更新失敗");
           cb.checked = !done;
+        }
+      });
+    }
+
+    // 刪除藥品
+    function deleteDrug(rowIndex) {
+      if (!confirm("確定要刪除這個藥品嗎？")) return;
+
+      fetch(WEB_APP_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "delete",
+          data: { rowIndex }
+        })
+      })
+      .then(res => res.json())
+      .then(result => {
+        if (result.status === "success") {
+          fetchDrugs();
+          fetchHistoryList();
+        } else {
+          alert("刪除失敗：" + result.message);
         }
       });
     }
