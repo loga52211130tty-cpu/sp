@@ -17,13 +17,10 @@ tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
 <body>
 
 <h2>智慧藥盒</h2>
-
-<!-- 目前時間 -->
 <div>
   <h3>目前時間：<span id="currentTime"></span></h3>
 </div>
 
-<!-- 新增藥品 -->
 <div>
   <input type="text" id="newName" list="drugNames" placeholder="藥品名稱">
   <datalist id="drugNames"></datalist>
@@ -31,7 +28,6 @@ tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
   <button onclick="addDrug()">新增藥品</button>
 </div>
 
-<!-- 藥品表格 -->
 <table id="drugTable">
   <thead>
     <tr>
@@ -46,25 +42,21 @@ tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
 </table>
 
 <script>
-const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE'; // 替換成你的 Web App URL
+const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE'; // 替換成 Web App URL
 let drugCache = [];
 const audio = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
 
-// 顯示目前時間
+// 時鐘
 function updateClock() {
   const now = new Date();
-  const h = now.getHours().toString().padStart(2,'0');
-  const m = now.getMinutes().toString().padStart(2,'0');
-  const s = now.getSeconds().toString().padStart(2,'0');
-  document.getElementById("currentTime").textContent = `${h}:${m}:${s}`;
+  document.getElementById("currentTime").textContent = now.toTimeString().slice(0,8);
 }
 setInterval(updateClock, 1000);
 updateClock();
 
-// 預設新增時間為現在
+// 預設時間
 function setDefaultTime(){
-  const now = new Date();
-  document.getElementById("newTime").value = now.toTimeString().slice(0,5);
+  document.getElementById("newTime").value = new Date().toTimeString().slice(0,5);
 }
 setDefaultTime();
 
@@ -183,8 +175,11 @@ function checkReminders(){
 
 // 初始化
 fetchDrugs();
-setInterval(fetchDrugs,10000);      // 每10秒更新資料
-setInterval(checkReminders,10000);  // 每10秒檢查提醒
+setInterval(fetchDrugs,10000);
+setInterval(checkReminders,10000);
+
+// 啟用通知權限
+if(Notification.permission!=="granted") Notification.requestPermission();
 
 </script>
 </body>
