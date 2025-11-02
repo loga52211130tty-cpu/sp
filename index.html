@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>人性化智慧藥盒</title>
+<title>智慧藥盒管理（人性化+歷史提示）</title>
 <style>
 body { font-family: Arial; }
 table { border-collapse: collapse; width: 70%; margin-top:10px; }
@@ -22,7 +22,8 @@ tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
 
 <!-- 新增藥品 -->
 <div>
-  <input type="text" id="newName" placeholder="藥品名稱">
+  <input type="text" id="newName" list="drugNames" placeholder="藥品名稱">
+  <datalist id="drugNames"></datalist>
   <input type="text" id="newTimes" placeholder="時間（多個用逗號隔開，如08:00,12:00）">
   <button onclick="addDrug()">新增藥品</button>
 </div>
@@ -45,30 +46,19 @@ tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
 const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE';
 let drugCache = [];
 
-// 取得資料並局部更新
+// 取得資料並更新表格
 function fetchDrugs() {
   fetch(WEB_APP_URL)
-    .then(res => res.json())
-    .then(json => {
-      if(json.status !== "success") return;
-      const newData = json.data;
-      // 如果數量不同就整表重繪
-      if(newData.length !== drugCache.length){
-        renderTable(newData);
-      } else {
-        // 局部更新
-        newData.forEach((item,i)=>{
-          const old = drugCache[i];
-          if(!old || JSON.stringify(old)!==JSON.stringify(item)){
-            updateRow(item);
-          }
-        });
-      }
-      drugCache = newData;
+    .then(res=>res.json())
+    .then(json=>{
+      if(json.status!=="success") return;
+      renderTable(json.data);
+      updateDatalist(json.data); // 更新歷史藥品提示
+      drugCache = json.data;
     });
 }
 
-// 渲染整表
+// 渲染表格
 function renderTable(data){
   const tbody = document.querySelector("#drugTable tbody");
   tbody.innerHTML="";
@@ -85,7 +75,7 @@ function renderTable(data){
     header.innerHTML=`<td colspan="5">${name}（點擊折疊/展開）</td>`;
     header.onclick = ()=>toggleGroup(name);
     tbody.appendChild(header);
-    // 內容
+    // 藥品時間列
     groupMap[name].forEach(item=>{
       const tr = document.createElement("tr");
       tr.dataset.rowIndex = item.rowIndex;
@@ -102,13 +92,16 @@ function renderTable(data){
   }
 }
 
-// 局部更新列
-function updateRow(item){
-  const row = document.querySelector(`tr[data-row-index="${item.rowIndex}"]`);
-  if(!row) return renderTable(drugCache);
-  row.querySelector("td:nth-child(2)").textContent=item.name;
-  row.querySelector("td:nth-child(3)").textContent=item.time;
-  row.querySelector("input[type=checkbox]").checked=item.done;
+// 更新 datalist（歷史藥品提示）
+function updateDatalist(data){
+  const dl = document.getElementById("drugNames");
+  dl.innerHTML="";
+  const names = [...new Set(data.map(d=>d.name))]; // 去重
+  names.forEach(n=>{
+    const option = document.createElement("option");
+    option.value = n;
+    dl.appendChild(option);
+  });
 }
 
 // 勾選已服用
@@ -116,6 +109,7 @@ function toggleDone(cb,rowIndex){
   const done=cb.checked;
   fetch(WEB_APP_URL,{
     method:"POST",
+    headers: {"Content-Type":"application/json"},
     body: JSON.stringify({action:"update",data:[{rowIndex,done}]})
   }).then(res=>res.json()).then(result=>{
     if(result.status!=="success"){ alert("更新失敗"); cb.checked=!done; }
@@ -127,15 +121,18 @@ function addDrug(){
   const name=document.getElementById("newName").value.trim();
   const times=document.getElementById("newTimes").value.trim().split(",");
   if(!name || times.length===0) return alert("請輸入名稱與時間");
-  let promises=[];
-  times.forEach(time=>{
-    promises.push(fetch(WEB_APP_URL,{
+
+  let promises = times.map(time =>
+    fetch(WEB_APP_URL,{
       method:"POST",
+      headers: {"Content-Type":"application/json"},
       body: JSON.stringify({action:"write",data:{name,time:time.trim(),done:false}})
-    }).then(res=>res.json()));
-  });
+    }).then(res=>res.json())
+  );
+
   Promise.all(promises).then(results=>{
-    results.forEach(r=>{ if(r.status!=="success") alert("新增失敗") });
+    let failed = results.filter(r=>r.status!=="success");
+    if(failed.length>0) alert("有些藥品新增失敗");
     document.getElementById("newName").value="";
     document.getElementById("newTimes").value="";
     fetchDrugs();
@@ -147,6 +144,7 @@ function deleteDrug(rowIndex){
   if(!confirm("確定刪除此藥品？")) return;
   fetch(WEB_APP_URL,{
     method:"POST",
+    headers: {"Content-Type":"application/json"},
     body: JSON.stringify({action:"delete",rowIndex})
   }).then(res=>res.json()).then(r=>{
     if(r.status==="success") fetchDrugs();
@@ -161,7 +159,7 @@ function toggleGroup(name){
   });
 }
 
-// 提醒
+// 提醒高亮
 function checkReminders(){
   const now = new Date();
   const nowTime = now.getHours()*60+now.getMinutes();
