@@ -16,14 +16,12 @@
 <body>
 <h2>智慧藥盒管理</h2>
 
-<!-- 新增藥品 -->
 <div>
   <input type="text" id="newName" placeholder="藥品名稱">
   <input type="time" id="newTime">
   <button onclick="addDrug()">新增藥品</button>
 </div>
 
-<!-- 列表 -->
 <table id="drugTable">
   <thead>
     <tr>
@@ -37,43 +35,79 @@
   <tbody></tbody>
 </table>
 
+<audio id="alertSound" preload="auto">
+  <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+</audio>
+
 <script>
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwxOl74ue1pG5rHSSueIwP5gMrA05lgTmk9PN1vSRzAYkcHPKHyNvTLNeAij2kvnYrv/exec';
+let drugData = [];           // 暫存藥品資料
+let alertedList = new Set(); // 已提醒過的藥品
 
-// 取得資料
+// 取得資料（完整更新）
 function fetchDrugs() {
   fetch(WEB_APP_URL)
     .then(res => res.json())
     .then(json => {
-      const tbody = document.querySelector("#drugTable tbody");
-      tbody.innerHTML = "";
-      const now = new Date();
-      const nowMins = now.getHours() * 60 + now.getMinutes();
-
-      json.data.forEach(item => {
-        const tr = document.createElement("tr");
-
-        // --- 計算是否接近服藥時間 ±5 分 ---
-        const [h, m] = item.time.split(":").map(Number);
-        const targetMins = h * 60 + m;
-        const diff = Math.abs(nowMins - targetMins);
-        if (diff <= 5 && !item.done) {
-          tr.classList.add("alert"); // 顯示提醒
-        }
-
-        tr.innerHTML = `
-          <td>${item.rowIndex - 1}</td>
-          <td>${item.name}</td>
-          <td>${item.time}</td>
-          <td><input type="checkbox" data-row-index="${item.rowIndex}" ${item.done ? 'checked' : ''} onchange="toggleDone(this)"></td>
-          <td><button onclick="deleteDrug(${item.rowIndex})">刪除</button></td>
-        `;
-        tbody.appendChild(tr);
-      });
+      if (json.status === "success") {
+        drugData = json.data;
+        renderTable();
+      }
     });
 }
 
-// 新增
+// 顯示資料表
+function renderTable() {
+  const tbody = document.querySelector("#drugTable tbody");
+  tbody.innerHTML = "";
+  drugData.forEach(item => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${item.rowIndex - 1}</td>
+      <td>${item.name}</td>
+      <td>${item.time}</td>
+      <td><input type="checkbox" data-row-index="${item.rowIndex}" ${item.done ? 'checked' : ''} onchange="toggleDone(this)"></td>
+      <td><button onclick="deleteDrug(${item.rowIndex})">刪除</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  checkReminders(); // 初次渲染時檢查提醒
+}
+
+// 檢查是否需提醒（不重新下載）
+function checkReminders() {
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const tbody = document.querySelector("#drugTable tbody");
+  const rows = tbody.querySelectorAll("tr");
+
+  drugData.forEach((item, idx) => {
+    const [h, m] = item.time.split(":").map(Number);
+    const targetMins = h * 60 + m;
+    const diff = Math.abs(nowMins - targetMins);
+    const tr = rows[idx];
+    
+    if (diff <= 5 && !item.done) {
+      tr.classList.add("alert");
+      if (!alertedList.has(item.rowIndex)) {
+        playAlert();
+        alertedList.add(item.rowIndex);
+      }
+    } else {
+      tr.classList.remove("alert");
+      alertedList.delete(item.rowIndex);
+    }
+  });
+}
+
+// 播放提示音
+function playAlert() {
+  const sound = document.getElementById("alertSound");
+  sound.currentTime = 0;
+  sound.play().catch(()=>{});
+}
+
+// 新增藥品
 function addDrug() {
   const name = document.getElementById("newName").value.trim();
   const time = document.getElementById("newTime").value;
@@ -95,7 +129,7 @@ function addDrug() {
   });
 }
 
-// 更新服用狀態
+// 勾選已服用
 function toggleDone(cb) {
   const rowIndex = parseInt(cb.dataset.rowIndex);
   const done = cb.checked;
@@ -109,12 +143,13 @@ function toggleDone(cb) {
       alert("更新失敗");
       cb.checked = !done;
     } else {
-      fetchDrugs(); // 即時更新提醒狀態
+      drugData.find(d => d.rowIndex === rowIndex).done = done;
+      checkReminders(); // 立即更新提醒狀態
     }
   });
 }
 
-// 刪除
+// 刪除藥品
 function deleteDrug(rowIndex) {
   if (!confirm("確定要刪除此藥品嗎？")) return;
   fetch(WEB_APP_URL, {
@@ -131,9 +166,10 @@ function deleteDrug(rowIndex) {
   });
 }
 
-// 初始化與自動刷新
+// 初始化
 fetchDrugs();
-setInterval(fetchDrugs, 60000); // 每 1 分鐘更新一次
+setInterval(checkReminders, 10000); // 🔁 每10秒檢查提醒（不重新載入）
+setInterval(fetchDrugs, 60000);     // 每1分鐘更新資料
 </script>
 </body>
 </html>
