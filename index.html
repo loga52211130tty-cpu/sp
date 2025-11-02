@@ -1,112 +1,141 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-<meta charset="UTF-8">
-<title>智慧藥盒</title>
-<style>
-body { font-family:'微軟正黑體'; padding:20px; background:#f5f5f5; }
-h1 { color:#2c3e50; }
-table { border-collapse:collapse; width:100%; background:white; }
-th,td { border:1px solid #ccc; padding:8px; text-align:center; }
-th { background:#3498db; color:white; }
-button { padding:5px 10px; border:none; border-radius:5px; cursor:pointer; }
-input { padding:5px; margin:4px; }
-</style>
-</head>
-<body>
+const SPREADSHEET_ID = "你的試算表ID"; // 改成你的試算表ID
+const SHEET_NAME = "Sheet1";
 
-<h1>智慧藥盒</h1>
-<div>目前時間：<span id="nowTime"></span></div>
+// ---------- 主頁 ----------
+function doGet(e) {
+  if (e && e.parameter.action === "read") return readData();
 
-<div>
-  藥品名稱：<input id="drugName" list="drugHistory">
-  <datalist id="drugHistory"></datalist>
-  時間(多個可逗號)：<input id="drugTime" placeholder="08:00,12:00">
-  <button onclick="addDrug()">新增藥品</button>
-</div>
+  const html = `
+  <html>
+  <head>
+    <meta charset="UTF-8">
+    <title>智慧藥盒</title>
+    <style>
+      body { font-family:'微軟正黑體'; padding:20px; background:#f5f5f5; }
+      table { border-collapse:collapse; width:100%; background:white; }
+      th,td { border:1px solid #ccc; padding:8px; text-align:center; }
+      th { background:#3498db; color:white; }
+      input,button { padding:5px; margin:4px; }
+      button { border:none; border-radius:5px; cursor:pointer; }
+    </style>
+  </head>
+  <body>
+    <h1>智慧藥盒</h1>
+    <div>目前時間：<span id="nowTime"></span></div>
 
-<table id="drugTable">
-<tr><th>#</th><th>藥品名稱</th><th>時間</th><th>已服用</th><th>操作</th></tr>
-</table>
+    <div>
+      藥品名稱：<input id="drugName" list="drugHistory">
+      <datalist id="drugHistory"></datalist>
+      時間(多個逗號)：<input id="drugTime" placeholder="08:00,12:00">
+      <button onclick="addDrug()">新增藥品</button>
+    </div>
 
-<script>
-const WEB_APP_URL = window.location.href;
+    <table id="drugTable">
+      <tr><th>#</th><th>藥品名稱</th><th>時間</th><th>已服用</th><th>操作</th></tr>
+    </table>
 
-// 時鐘
-function updateClock(){
-  const now=new Date();
-  document.getElementById('nowTime').innerText=now.toLocaleTimeString('zh-TW',{hour12:false});
+    <script>
+      const WEB_APP_URL = window.location.href;
+
+      function updateClock() {
+        const now = new Date();
+        document.getElementById('nowTime').innerText = now.toLocaleTimeString('zh-TW',{hour12:false});
+      }
+      setInterval(updateClock,1000);
+      updateClock();
+
+      async function loadData(){
+        const res = await fetch(WEB_APP_URL + "?action=read");
+        const data = await res.json();
+        const tbody = document.getElementById('drugTable');
+        tbody.innerHTML='<tr><th>#</th><th>藥品名稱</th><th>時間</th><th>已服用</th><th>操作</th></tr>';
+
+        // 歷史藥品下拉
+        const dl = document.getElementById('drugHistory');
+        dl.innerHTML='';
+        [...new Set(data.map(d=>d.name))].forEach(n=>{
+          const opt=document.createElement('option'); opt.value=n; dl.appendChild(opt);
+        });
+
+        data.forEach((r,i)=>{
+          const tr=document.createElement('tr');
+          tr.innerHTML=\`
+            <td>\${i+1}</td>
+            <td>\${r.name}</td>
+            <td>\${r.time}</td>
+            <td><input type="checkbox" \${r.done==='TRUE'?'checked':''} onchange="toggleDone(\${i+2},this.checked)"></td>
+            <td><button onclick="deleteDrug(\${i+2})">刪除</button></td>
+          \`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      async function addDrug(){
+        const name=document.getElementById('drugName').value.trim();
+        const time=document.getElementById('drugTime').value.trim();
+        if(!name || !time) return alert('請輸入藥品名稱與時間');
+
+        await fetch(WEB_APP_URL,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({action:'add',name,time})
+        });
+
+        document.getElementById('drugName').value='';
+        document.getElementById('drugTime').value='';
+        loadData();
+      }
+
+      async function toggleDone(row,checked){
+        await fetch(WEB_APP_URL,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({action:'done',row})
+        });
+        loadData();
+      }
+
+      async function deleteDrug(row){
+        if(!confirm('確定刪除?')) return;
+        await fetch(WEB_APP_URL,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({action:'delete',row})
+        });
+        loadData();
+      }
+
+      loadData();
+      setInterval(loadData,10000);
+    </script>
+  </body>
+  </html>
+  `;
+
+  return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
-setInterval(updateClock,1000);
-updateClock();
 
-// 載入資料
-async function loadData(){
-  const res = await fetch(WEB_APP_URL + "?action=read");
-  const data = await res.json();
-  const tbody = document.getElementById('drugTable');
-  tbody.innerHTML='<tr><th>#</th><th>藥品名稱</th><th>時間</th><th>已服用</th><th>操作</th></tr>';
-
-  // 歷史藥品名稱下拉
-  const dl = document.getElementById('drugHistory');
-  dl.innerHTML='';
-  [...new Set(data.map(d=>d.name))].forEach(n=>{
-    const opt=document.createElement('option'); opt.value=n; dl.appendChild(opt);
-  });
-
-  data.forEach((r,i)=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`
-      <td>${i+1}</td>
-      <td>${r.name}</td>
-      <td>${r.time}</td>
-      <td><input type="checkbox" ${r.done==='TRUE'?'checked':''} onchange="toggleDone(${i+2},this.checked)"></td>
-      <td><button onclick="deleteDrug(${i+2})">刪除</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
+// ---------- 讀取資料 ----------
+function readData(){
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  const rows = sheet.getDataRange().getValues().slice(1);
+  const result = rows.map(r=>({name:r[1],time:r[2],done:r[3]}));
+  return ContentService.createTextOutput(JSON.stringify(result))
+                       .setMimeType(ContentService.MimeType.JSON);
 }
 
-// 新增藥品
-async function addDrug(){
-  const name=document.getElementById('drugName').value.trim();
-  const time=document.getElementById('drugTime').value.trim();
-  if(!name||!time) return alert('請輸入藥品名稱與時間');
+// ---------- POST 操作 ----------
+function doPost(e){
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  const data = JSON.parse(e.postData.contents);
 
-  await fetch(WEB_APP_URL,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({action:'add',name,time})
-  });
-  document.getElementById('drugName').value='';
-  document.getElementById('drugTime').value='';
-  loadData();
+  if(data.action==='add'){
+    sheet.appendRow([sheet.getLastRow(),data.name,data.time,false]);
+  } else if(data.action==='done'){
+    sheet.getRange(data.row,4).setValue(true);
+  } else if(data.action==='delete'){
+    sheet.deleteRow(data.row);
+  }
+
+  return ContentService.createTextOutput('OK');
 }
-
-// 勾選已服用
-async function toggleDone(row,checked){
-  await fetch(WEB_APP_URL,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({action:'done',row})
-  });
-  loadData();
-}
-
-// 刪除藥品
-async function deleteDrug(row){
-  if(!confirm('確定刪除?')) return;
-  await fetch(WEB_APP_URL,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({action:'delete',row})
-  });
-  loadData();
-}
-
-loadData();
-setInterval(loadData,10000); // 每10秒刷新一次
-</script>
-
-</body>
-</html>
