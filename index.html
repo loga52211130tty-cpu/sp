@@ -2,10 +2,10 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>智慧藥盒管理（人性化+歷史提示）</title>
+<title>智慧藥盒管理（完整版）</title>
 <style>
 body { font-family: Arial; }
-table { border-collapse: collapse; width: 70%; margin-top:10px; }
+table { border-collapse: collapse; width: 80%; margin-top:10px; }
 th, td { border: 1px solid #333; padding: 8px; text-align: center; }
 th { background-color: #eee; }
 input[type="text"], input[type="time"] { width: 100%; }
@@ -43,17 +43,25 @@ tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
 </table>
 
 <script>
-const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE';
+const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE'; // ← 替換成你最新部署 Web App URL
 let drugCache = [];
 
-// 取得資料並更新表格
+// 提醒音效
+const audio = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
+
+// 請求瀏覽器通知權限
+if (Notification.permission !== "granted") {
+  Notification.requestPermission();
+}
+
+// 取得資料
 function fetchDrugs() {
   fetch(WEB_APP_URL)
-    .then(res=>res.json())
-    .then(json=>{
-      if(json.status!=="success") return;
+    .then(res => res.json())
+    .then(json => {
+      if(json.status !== "success") return;
       renderTable(json.data);
-      updateDatalist(json.data); // 更新歷史藥品提示
+      updateDatalist(json.data);
       drugCache = json.data;
     });
 }
@@ -61,9 +69,9 @@ function fetchDrugs() {
 // 渲染表格
 function renderTable(data){
   const tbody = document.querySelector("#drugTable tbody");
-  tbody.innerHTML="";
+  tbody.innerHTML = "";
   let groupMap = {};
-  data.forEach(item=>{
+  data.forEach(item => {
     if(!groupMap[item.name]) groupMap[item.name]=[];
     groupMap[item.name].push(item);
   });
@@ -75,7 +83,7 @@ function renderTable(data){
     header.innerHTML=`<td colspan="5">${name}（點擊折疊/展開）</td>`;
     header.onclick = ()=>toggleGroup(name);
     tbody.appendChild(header);
-    // 藥品時間列
+    // 藥品列
     groupMap[name].forEach(item=>{
       const tr = document.createElement("tr");
       tr.dataset.rowIndex = item.rowIndex;
@@ -96,7 +104,7 @@ function renderTable(data){
 function updateDatalist(data){
   const dl = document.getElementById("drugNames");
   dl.innerHTML="";
-  const names = [...new Set(data.map(d=>d.name))]; // 去重
+  const names = [...new Set(data.map(d=>d.name))];
   names.forEach(n=>{
     const option = document.createElement("option");
     option.value = n;
@@ -118,8 +126,8 @@ function toggleDone(cb,rowIndex){
 
 // 新增藥品（可多時間）
 function addDrug(){
-  const name=document.getElementById("newName").value.trim();
-  const times=document.getElementById("newTimes").value.trim().split(",");
+  const name = document.getElementById("newName").value.trim();
+  const times = document.getElementById("newTimes").value.trim().split(",");
   if(!name || times.length===0) return alert("請輸入名稱與時間");
 
   let promises = times.map(time =>
@@ -152,14 +160,14 @@ function deleteDrug(rowIndex){
   });
 }
 
-// 折疊/展開分組
+// 分組折疊
 function toggleGroup(name){
   document.querySelectorAll(`tr[data-group="${name}"]`).forEach(tr=>{
     tr.style.display = (tr.style.display==="none")?"":"none";
   });
 }
 
-// 提醒高亮
+// 提醒高亮 + 音效 + 通知
 function checkReminders(){
   const now = new Date();
   const nowTime = now.getHours()*60+now.getMinutes();
@@ -169,16 +177,28 @@ function checkReminders(){
     if(!timeText) return;
     const [h,m] = timeText.split(":").map(Number);
     const target = h*60+m;
-    const diff = Math.abs(target-nowTime);
-    if(diff<=5 && !tr.querySelector("input[type=checkbox]").checked) tr.classList.add("remind");
-    else tr.classList.remove("remind");
+    const diff = target - nowTime;
+    const checkbox = tr.querySelector("input[type=checkbox]");
+    
+    if(diff >= 0 && diff <= 5 && !checkbox.checked){
+      tr.classList.add("remind");
+      audio.play().catch(e=>console.log("播放音效失敗", e));
+      if(Notification.permission === "granted"){
+        const name = tr.children[1].textContent;
+        const timeStr = tr.children[2].textContent;
+        new Notification("智慧藥盒提醒", {
+          body: `${timeStr} 要服用 ${name}`,
+          icon: "https://img.icons8.com/color/48/000000/pill.png"
+        });
+      }
+    } else tr.classList.remove("remind");
   });
 }
 
 // 初始化
 fetchDrugs();
-setInterval(fetchDrugs,10000);
-setInterval(checkReminders,10000);
+setInterval(fetchDrugs,10000);      // 每 10 秒刷新試算表
+setInterval(checkReminders,10000);  // 每 10 秒檢查提醒
 </script>
 
 </body>
