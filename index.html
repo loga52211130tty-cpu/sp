@@ -2,28 +2,32 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>智慧藥盒管理</title>
+<title>人性化智慧藥盒</title>
 <style>
-  table { border-collapse: collapse; width: 60%; }
-  th, td { border: 1px solid #333; padding: 8px; text-align: center; }
-  th { background-color: #eee; }
-  input[type="text"], input[type="time"] { width: 100%; }
-  button { padding: 4px 8px; }
-  tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
-  @keyframes blink { from {background-color: #fff176;} to {background-color: #fff;} }
+body { font-family: Arial; }
+table { border-collapse: collapse; width: 70%; margin-top:10px; }
+th, td { border: 1px solid #333; padding: 8px; text-align: center; }
+th { background-color: #eee; }
+input[type="text"], input[type="time"] { width: 100%; }
+button { padding: 4px 8px; }
+tr.remind { background-color: #ffeb3b; animation: blink 1s infinite alternate; }
+@keyframes blink { from {background-color: #fff176;} to {background-color: #fff;} }
+.group-header { background-color: #ddd; cursor: pointer; }
+.group-header:hover { background-color: #ccc; }
 </style>
 </head>
 <body>
+
 <h2>智慧藥盒管理</h2>
 
-<!-- 新增藥品區 -->
+<!-- 新增藥品 -->
 <div>
   <input type="text" id="newName" placeholder="藥品名稱">
-  <input type="time" id="newTime">
+  <input type="text" id="newTimes" placeholder="時間（多個用逗號隔開，如08:00,12:00）">
   <button onclick="addDrug()">新增藥品</button>
 </div>
 
-<!-- 藥品列表 -->
+<!-- 藥品表格 -->
 <table id="drugTable">
   <thead>
     <tr>
@@ -38,141 +42,146 @@
 </table>
 
 <script>
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwxOl74ue1pG5rHSSueIwP5gMrA05lgTmk9PN1vSRzAYkcHPKHyNvTLNeAij2kvnYrv/exec';
+const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE';
 let drugCache = [];
 
-// ----------- 取得試算表資料並局部更新 -----------
+// 取得資料並局部更新
 function fetchDrugs() {
   fetch(WEB_APP_URL)
     .then(res => res.json())
     .then(json => {
-      if (json.status !== "success") return;
-
+      if(json.status !== "success") return;
       const newData = json.data;
-      const tbody = document.querySelector("#drugTable tbody");
-
-      // 比對變更：若藥品數量不同，直接重畫
-      if (newData.length !== drugCache.length) {
+      // 如果數量不同就整表重繪
+      if(newData.length !== drugCache.length){
         renderTable(newData);
-        drugCache = newData;
-        return;
+      } else {
+        // 局部更新
+        newData.forEach((item,i)=>{
+          const old = drugCache[i];
+          if(!old || JSON.stringify(old)!==JSON.stringify(item)){
+            updateRow(item);
+          }
+        });
       }
-
-      // 局部比對：若資料不同，只更新變更的列
-      newData.forEach((item, i) => {
-        const old = drugCache[i];
-        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
-          updateRow(item);
-        }
-      });
-
       drugCache = newData;
     });
 }
 
-// ----------- 渲染整個表格 -----------
-function renderTable(data) {
+// 渲染整表
+function renderTable(data){
   const tbody = document.querySelector("#drugTable tbody");
-  tbody.innerHTML = "";
-  data.forEach(item => {
-    const tr = document.createElement("tr");
-    tr.dataset.rowIndex = item.rowIndex;
-    tr.innerHTML = `
-      <td>${item.rowIndex - 1}</td>
-      <td>${item.name}</td>
-      <td>${item.time}</td>
-      <td><input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleDone(this, ${item.rowIndex})"></td>
-      <td><button onclick="deleteDrug(${item.rowIndex})">刪除</button></td>
-    `;
-    tbody.appendChild(tr);
+  tbody.innerHTML="";
+  let groupMap = {};
+  data.forEach(item=>{
+    if(!groupMap[item.name]) groupMap[item.name]=[];
+    groupMap[item.name].push(item);
   });
+  let idx=1;
+  for(let name in groupMap){
+    // 分組標題
+    const header = document.createElement("tr");
+    header.className="group-header";
+    header.innerHTML=`<td colspan="5">${name}（點擊折疊/展開）</td>`;
+    header.onclick = ()=>toggleGroup(name);
+    tbody.appendChild(header);
+    // 內容
+    groupMap[name].forEach(item=>{
+      const tr = document.createElement("tr");
+      tr.dataset.rowIndex = item.rowIndex;
+      tr.dataset.group = name;
+      tr.innerHTML=`
+        <td>${idx++}</td>
+        <td>${item.name}</td>
+        <td>${item.time}</td>
+        <td><input type="checkbox" ${item.done?'checked':''} onchange="toggleDone(this,${item.rowIndex})"></td>
+        <td><button onclick="deleteDrug(${item.rowIndex})">刪除</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
 }
 
-// ----------- 更新單一列（不重畫整表）-----------
-function updateRow(item) {
+// 局部更新列
+function updateRow(item){
   const row = document.querySelector(`tr[data-row-index="${item.rowIndex}"]`);
-  if (!row) return renderTable(drugCache); // 若找不到列，就整個重畫
-  row.querySelector("td:nth-child(2)").textContent = item.name;
-  row.querySelector("td:nth-child(3)").textContent = item.time;
-  row.querySelector("input[type=checkbox]").checked = item.done;
+  if(!row) return renderTable(drugCache);
+  row.querySelector("td:nth-child(2)").textContent=item.name;
+  row.querySelector("td:nth-child(3)").textContent=item.time;
+  row.querySelector("input[type=checkbox]").checked=item.done;
 }
 
-// ----------- 新增藥品 -----------
-function addDrug() {
-  const name = document.getElementById("newName").value.trim();
-  const time = document.getElementById("newTime").value;
-  if (!name || !time) return alert("請輸入藥品名稱與時間");
-
-  fetch(WEB_APP_URL, {
-    method: "POST",
-    body: JSON.stringify({ action: "write", data: { name, time, done: false } })
-  })
-  .then(res => res.json())
-  .then(result => {
-    if (result.status === "success") {
-      document.getElementById("newName").value = "";
-      document.getElementById("newTime").value = "";
-      fetchDrugs();
-    } else {
-      alert("新增失敗：" + result.message);
-    }
+// 勾選已服用
+function toggleDone(cb,rowIndex){
+  const done=cb.checked;
+  fetch(WEB_APP_URL,{
+    method:"POST",
+    body: JSON.stringify({action:"update",data:[{rowIndex,done}]})
+  }).then(res=>res.json()).then(result=>{
+    if(result.status!=="success"){ alert("更新失敗"); cb.checked=!done; }
   });
 }
 
-// ----------- 勾選已服用 -----------
-function toggleDone(cb, rowIndex) {
-  const done = cb.checked;
-  fetch(WEB_APP_URL, {
-    method: "POST",
-    body: JSON.stringify({ action: "update", data: [{ rowIndex, done }] })
-  })
-  .then(res => res.json())
-  .then(result => {
-    if (result.status !== "success") {
-      alert("更新失敗");
-      cb.checked = !done;
-    }
+// 新增藥品（可多時間）
+function addDrug(){
+  const name=document.getElementById("newName").value.trim();
+  const times=document.getElementById("newTimes").value.trim().split(",");
+  if(!name || times.length===0) return alert("請輸入名稱與時間");
+  let promises=[];
+  times.forEach(time=>{
+    promises.push(fetch(WEB_APP_URL,{
+      method:"POST",
+      body: JSON.stringify({action:"write",data:{name,time:time.trim(),done:false}})
+    }).then(res=>res.json()));
+  });
+  Promise.all(promises).then(results=>{
+    results.forEach(r=>{ if(r.status!=="success") alert("新增失敗") });
+    document.getElementById("newName").value="";
+    document.getElementById("newTimes").value="";
+    fetchDrugs();
   });
 }
 
-// ----------- 刪除藥品 -----------
-function deleteDrug(rowIndex) {
-  if (!confirm("確定刪除此藥品？")) return;
-  fetch(WEB_APP_URL, {
-    method: "POST",
-    body: JSON.stringify({ action: "delete", rowIndex })
-  })
-  .then(res => res.json())
-  .then(result => {
-    if (result.status === "success") fetchDrugs();
-    else alert("刪除失敗：" + result.message);
+// 刪除藥品
+function deleteDrug(rowIndex){
+  if(!confirm("確定刪除此藥品？")) return;
+  fetch(WEB_APP_URL,{
+    method:"POST",
+    body: JSON.stringify({action:"delete",rowIndex})
+  }).then(res=>res.json()).then(r=>{
+    if(r.status==="success") fetchDrugs();
+    else alert("刪除失敗");
   });
 }
 
-// ----------- 自動提醒功能 -----------
-function checkReminders() {
+// 折疊/展開分組
+function toggleGroup(name){
+  document.querySelectorAll(`tr[data-group="${name}"]`).forEach(tr=>{
+    tr.style.display = (tr.style.display==="none")?"":"none";
+  });
+}
+
+// 提醒
+function checkReminders(){
   const now = new Date();
-  const nowTime = now.getHours() * 60 + now.getMinutes();
-
-  document.querySelectorAll("#drugTable tbody tr").forEach(tr => {
+  const nowTime = now.getHours()*60+now.getMinutes();
+  document.querySelectorAll("#drugTable tbody tr").forEach(tr=>{
+    if(!tr.dataset.rowIndex) return;
     const timeText = tr.children[2].textContent;
-    if (!timeText) return;
-    const [h, m] = timeText.split(":").map(Number);
-    const target = h * 60 + m;
-    const diff = Math.abs(target - nowTime);
-
-    if (diff <= 5 && !tr.querySelector("input[type=checkbox]").checked) {
-      tr.classList.add("remind");
-    } else {
-      tr.classList.remove("remind");
-    }
+    if(!timeText) return;
+    const [h,m] = timeText.split(":").map(Number);
+    const target = h*60+m;
+    const diff = Math.abs(target-nowTime);
+    if(diff<=5 && !tr.querySelector("input[type=checkbox]").checked) tr.classList.add("remind");
+    else tr.classList.remove("remind");
   });
 }
 
-// ----------- 初始化 -----------
+// 初始化
 fetchDrugs();
-setInterval(fetchDrugs, 10000); // 每10秒局部同步試算表
-setInterval(checkReminders, 10000); // 每10秒檢查提醒
+setInterval(fetchDrugs,10000);
+setInterval(checkReminders,10000);
 </script>
+
 </body>
 </html>
