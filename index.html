@@ -80,43 +80,31 @@
     function toggleDone(cb) {
       const rowIndex = parseInt(cb.dataset.rowIndex);
       const done = cb.checked;
-
       fetch(WEB_APP_URL, {
         method: "POST",
-        body: JSON.stringify({
-          action: "update",
-          data: [{ rowIndex, done }]
-        })
-      })
-      .then(res => res.json())
-      .then(result => {
-        if(result.status !== "success") {
-          alert("更新失敗");
-          cb.checked = !done; // 回復原狀
-        }
-      });
+        body: JSON.stringify({ action:"update", data:[{rowIndex, done}] })
+      }).then(res=>res.json())
+        .then(result=>{
+          if(result.status!=="success") {
+            alert("更新失敗");
+            cb.checked = !done;
+          }
+        });
     }
 
     // 刪除藥品
     function deleteDrug(rowIndex) {
-      if (!confirm("確定要刪除這個藥品嗎？")) return;
-
+      if(!confirm("確定要刪除這個藥品嗎？")) return;
       fetch(WEB_APP_URL, {
-        method: "POST",
-        body: JSON.stringify({
-          action: "delete",
-          data: { rowIndex }
-        })
-      })
-      .then(res => res.json())
-      .then(result => {
-        if(result.status === "success") {
-          fetchDrugs();       // 刪除後立即更新表格
-          fetchHistoryList(); // 同步歷史藥品
-        } else {
-          alert("刪除失敗：" + result.message);
-        }
-      });
+        method:"POST",
+        body: JSON.stringify({ action:"delete", data:{rowIndex} })
+      }).then(res=>res.json())
+        .then(result=>{
+          if(result.status==="success") {
+            fetchDrugs();       
+            fetchHistoryList();
+          } else alert("刪除失敗："+result.message);
+        });
     }
 
     // 新增藥品
@@ -125,30 +113,19 @@
       const manual = document.getElementById("newName").value.trim();
       const name = manual || selected;
       const time = document.getElementById("newTime").value;
-
-      if (!name || !time) {
-        alert("請輸入藥品名稱與時間");
-        return;
-      }
-
+      if(!name || !time){ alert("請輸入藥品名稱與時間"); return; }
       fetch(WEB_APP_URL, {
-        method: "POST",
-        body: JSON.stringify({
-          action: "write",
-          data: { name, time, done: false }
-        })
-      })
-      .then(res => res.json())
-      .then(result => {
-        if(result.status === "success") {
-          document.getElementById("newName").value = "";
-          document.getElementById("newTime").value = "";
-          fetchDrugs();       // 新增後立即更新表格
-          fetchHistoryList(); // 同步歷史藥品
-        } else {
-          alert("新增失敗：" + result.message);
-        }
-      });
+        method:"POST",
+        body: JSON.stringify({ action:"write", data:{name,time,done:false} })
+      }).then(res=>res.json())
+        .then(result=>{
+          if(result.status==="success"){
+            document.getElementById("newName").value="";
+            document.getElementById("newTime").value="";
+            fetchDrugs();       
+            fetchHistoryList();
+          } else alert("新增失敗："+result.message);
+        });
     }
 
     // 取得歷史藥品列表
@@ -171,7 +148,7 @@
     fetchDrugs();
     fetchHistoryList();
 
-    // 自動每秒刷新藥品清單（防止多人共用時資料不同步）
+    // 自動每秒刷新藥品清單
     setInterval(fetchDrugs, 1000);
   </script>
 </body>
