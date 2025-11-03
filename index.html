@@ -4,47 +4,155 @@
 <meta charset="UTF-8">
 <title>智慧藥盒管理</title>
 <style>
-table {border-collapse: collapse; width: 80%; margin-bottom: 20px;}
-th, td {border: 1px solid #333; padding: 8px; text-align: center;}
-th {background-color: #eee;}
-select, input[type="text"], input[type="time"] {width: 100%;}
-button {padding: 4px 8px;}
+  table {border-collapse: collapse; width: 80%; margin-bottom: 20px;}
+  th, td {border: 1px solid #333; padding: 8px; text-align: center;}
+  th {background-color: #eee;}
+  select, input[type="text"], input[type="time"] {width: 100%;}
+  button {padding: 4px 8px;}
 </style>
 </head>
 <body>
 <h2>智慧藥盒管理</h2>
+
 <div>
-<select id="drugSelect"><option value="">-- 選擇歷史藥品 --</option></select>
-<input type="text" id="newName" placeholder="或輸入新藥品名稱">
-<input type="time" id="newTime">
-<button onclick="addDrug()">新增藥品</button>
+  <select id="drugSelect"><option value="">-- 選擇歷史藥品 --</option></select>
+  <input type="text" id="newName" placeholder="或輸入新藥品名稱">
+  <input type="time" id="newTime">
+  <button onclick="addDrug()">新增藥品</button>
 </div>
+
 <h3>目前藥品列表</h3>
 <table id="drugTable">
-<thead><tr><th>序號</th><th>藥品名稱</th><th>日期</th><th>時間</th><th>已吃</th><th>操作</th></tr></thead>
-<tbody></tbody>
+  <thead>
+    <tr><th>序號</th><th>藥品名稱</th><th>日期</th><th>時間</th><th>已吃</th><th>操作</th></tr>
+  </thead>
+  <tbody></tbody>
 </table>
+
 <h3>漏吃藥品列表</h3>
 <table id="missedTable">
-<thead><tr><th>序號</th><th>藥品名稱(漏吃藥品)</th><th>日期</th><th>時間</th></tr></thead>
-<tbody></tbody>
+  <thead>
+    <tr><th>序號</th><th>藥品名稱(漏吃藥品)</th><th>日期</th><th>時間</th></tr>
+  </thead>
+  <tbody></tbody>
 </table>
+
 <script>
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwxOl74ue1pG5rHSSueIwP5gMrA05lgTmk9PN1vSRzAYkcHPKHyNvTLNeAij2kvnYrv/exec';
 let mainVersion = 0, missedVersion = 0;
 
-async function fetchMain() { const res = await fetch(WEB_APP_URL); const json = await res.json(); if(json.version !== mainVersion){ mainVersion = json.version; const tbody = document.querySelector("#drugTable tbody"); tbody.innerHTML = ""; json.data.forEach((item, idx) => { const tr = document.createElement("tr"); tr.innerHTML = `<td>${idx+1}</td><td>${item.name}</td><td>${item.date}</td><td>${item.time}</td><td><input type="checkbox" data-row-index="${item.rowIndex}" ${item.done?'checked':''} onchange="toggleDone(this)"></td><td><button onclick="deleteDrug(${item.rowIndex})">刪除</button></td>`; tbody.appendChild(tr); }); } fetchMissed(); }
+// 取得主表
+async function fetchMain(){
+  const res = await fetch(WEB_APP_URL);
+  const json = await res.json();
+  if(json.status !== "success") return;
 
-async function fetchMissed() { const res = await fetch(WEB_APP_URL+'?mode=missed'); const json = await res.json(); if(json.version !== missedVersion){ missedVersion = json.version; const tbody = document.querySelector("#missedTable tbody"); tbody.innerHTML = ""; json.missed.forEach((item, idx) => { const tr = document.createElement("tr"); tr.innerHTML = `<td>${idx+1}</td><td>${item.name}</td><td>${item.date}</td><td>${item.time}</td>`; tbody.appendChild(tr); }); } }
+  if(json.version !== mainVersion){
+    mainVersion = json.version;
+    const tbody = document.querySelector("#drugTable tbody");
+    tbody.innerHTML = "";
+    json.data.forEach((item, idx) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${idx+1}</td>
+        <td>${item.name}</td>
+        <td>${item.date}</td>
+        <td>${item.time}</td>
+        <td><input type="checkbox" data-row-index="${item.rowIndex}" ${item.done?'checked':''} onchange="toggleDone(this)"></td>
+        <td><button onclick="deleteDrug(${item.rowIndex})">刪除</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
 
-async function toggleDone(cb){ const rowIndex = parseInt(cb.dataset.rowIndex), done = cb.checked; const res = await fetch(WEB_APP_URL, {method:"POST", body:JSON.stringify({action:"update", data:[{rowIndex, done}]})}); const json = await res.json(); if(json.status==="success") fetchMain(); else { alert("更新失敗"); cb.checked = !done; } }
+  fetchMissed();
+}
 
-async function addDrug() { const selected = document.getElementById("drugSelect").value; const manual = document.getElementById("newName").value.trim(); const name = manual || selected; const time = document.getElementById("newTime").value; if(!name || !time){ alert("請輸入藥品名稱與時間"); return; } const today = new Date(); const date = today.getFullYear()+'/'+(today.getMonth()+1)+'/'+today.getDate(); const res = await fetch(WEB_APP_URL, {method:"POST", body:JSON.stringify({action:"write", data:{name,date,time,done:false}})}); const json = await res.json(); if(json.status==="success"){ document.getElementById("newName").value=""; document.getElementById("newTime").value=""; fetchMain(); fetchHistory(); } else alert("新增失敗: "+json.message); }
+// 取得漏吃表
+async function fetchMissed(){
+  const res = await fetch(WEB_APP_URL+'?mode=missed');
+  const json = await res.json();
+  if(json.version !== missedVersion){
+    missedVersion = json.version;
+    const tbody = document.querySelector("#missedTable tbody");
+    tbody.innerHTML = "";
+    json.missed.forEach((item, idx) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${idx+1}</td>
+        <td>${item.name}</td>
+        <td>${item.date}</td>
+        <td>${item.time}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+}
 
-async function deleteDrug(rowIndex){ if(!confirm("確定刪除?")) return; const res = await fetch(WEB_APP_URL, {method:"POST", body:JSON.stringify({action:"delete", data:{rowIndex}})}); const json = await res.json(); if(json.status==="success") { fetchMain(); fetchHistory(); } else alert("刪除失敗:"+json.message); }
+// 勾選已吃
+async function toggleDone(cb){
+  const rowIndex = parseInt(cb.dataset.rowIndex);
+  const done = cb.checked;
+  const res = await fetch(WEB_APP_URL, {
+    method: "POST",
+    body: JSON.stringify({action:"update", data:[{rowIndex, done}]})
+  });
+  const json = await res.json();
+  if(json.status==="success") fetchMain();
+  else { alert("更新失敗"); cb.checked = !done; }
+}
 
-async function fetchHistory(){ const res = await fetch(WEB_APP_URL+'?mode=history'); const json = await res.json(); const select = document.getElementById("drugSelect"); select.innerHTML = '<option value="">-- 選擇歷史藥品 --</option>'; json.history.forEach(name => { const opt = document.createElement("option"); opt.value = name; opt.textContent = name; select.appendChild(opt); }); }
+// 新增藥品
+async function addDrug(){
+  const selected = document.getElementById("drugSelect").value;
+  const manual = document.getElementById("newName").value.trim();
+  const name = manual || selected;
+  const time = document.getElementById("newTime").value;
+  if(!name || !time){ alert("請輸入藥品名稱與時間"); return; }
 
+  const today = new Date();
+  const date = today.getFullYear()+'/'+(today.getMonth()+1)+'/'+today.getDate();
+
+  const res = await fetch(WEB_APP_URL, {
+    method: "POST",
+    body: JSON.stringify({action:"write", data:{name,date,time,done:false}})
+  });
+  const json = await res.json();
+  if(json.status==="success"){
+    document.getElementById("newName").value = "";
+    document.getElementById("newTime").value = "";
+    fetchMain();
+    fetchHistory();
+  } else alert("新增失敗: "+json.message);
+}
+
+// 刪除藥品
+async function deleteDrug(rowIndex){
+  if(!confirm("確定刪除?")) return;
+  const res = await fetch(WEB_APP_URL, {
+    method: "POST",
+    body: JSON.stringify({action:"delete", data:{rowIndex}})
+  });
+  const json = await res.json();
+  if(json.status==="success"){ fetchMain(); fetchHistory(); }
+  else alert("刪除失敗: "+json.message);
+}
+
+// 歷史藥品
+async function fetchHistory(){
+  const res = await fetch(WEB_APP_URL+'?mode=history');
+  const json = await res.json();
+  const select = document.getElementById("drugSelect");
+  select.innerHTML = '<option value="">-- 選擇歷史藥品 --</option>';
+  json.history.forEach(name=>{
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    select.appendChild(opt);
+  });
+}
+
+// 初始化
 fetchMain();
 fetchHistory();
 setInterval(()=>{ fetchMain(); fetchHistory(); },5000);
